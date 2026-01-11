@@ -1,0 +1,88 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# =========================
+# Packaging / Build
+# =========================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Python tools
+# =========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.dmypy.json
+.pyre/
+
+# =========================
+# Jupyter / ML
+# =========================
+.ipynb_checkpoints/
+*.h5
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.joblib
+
+# =========================
+# Django
+# =========================
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# =========================
+# FastAPI / Flask
+# =========================
+instance/
+.webassets-cache
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# IDEs & Editors
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# =========================
+# OS
+# =========================
+Thumbs.db
+
+# =========================
+# Misc
+# =========================
+*.bak
+*.tmp
+*.orig
