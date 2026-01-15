@@ -46,17 +46,19 @@ class AuthorizationAPIView(APIView):
                         password = data.get('password')
 
                         if not username:
-                                return JsonResponse({'message' : 'Username is required'})
+                                return JsonResponse({'message' : 'Username is required'} , status = status.HTTP_400_BAD_REQUEST)
                         
                         if not password:
-                                return JsonResponse({'message' : 'Password is required'})
+                                return JsonResponse({'message' : 'Password is required'} , status = status.HTTP_400_BAD_REQUEST)
                         
                         user = authenticate(request=request, username = username , password = password)
 
-                        refresh = RefreshToken.for_user(user=user)
+                        
 
                         if not user :
                                 return JsonResponse({'message' : 'Invalid CRedentials'} , status = status.HTTP_401_UNAUTHORIZED)
+                        
+                        refresh = RefreshToken.for_user(user=user)
 
                         return JsonResponse(
                                 {
