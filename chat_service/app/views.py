@@ -1,7 +1,8 @@
 from django.http import JsonResponse
 from rest_framework.views import APIView
 
-from chat_app_be.chat_service.app.models import Contact
+from app.models import Contact
+from utils.auth_verification import authVerification
 
 
 def root(request):
@@ -15,6 +16,8 @@ class ChatAPIView(APIView):
     def get(self , request):
 
         try:
+
+            authVerification()
 
             contacts = Contact.objects.all()
         
