@@ -14,6 +14,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_routes.router, prefix="/auth")
+app.include_router(auth_routes.router, prefix="/chat")
 
 
 
