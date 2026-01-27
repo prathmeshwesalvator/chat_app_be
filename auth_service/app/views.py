@@ -1,120 +1,132 @@
-from django.http import JsonResponse
-from django.contrib.auth import authenticate , login
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny , IsAuthenticated 
-from rest_framework import status 
-from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
+
+
 
 def root(request):
-        return JsonResponse({'message' : 'Welcome To The Auth Service'})
+        return Response({'message' : 'Welcome To The Auth Service'})
 
 
 
 class AuthorizationAPIView(APIView):
-        
-        permission_classes = [AllowAny]
+    permission_classes = [AllowAny]
 
-        def get(self , request):
-                
-                try : 
-                        if not request.user:
-                                return JsonResponse({'message' : 'token is unavailable'} , status = status.HTTP_401_UNAUTHORIZED)
-                        
-                        user = request.user
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response(
+                {'message': 'Token is missing or invalid'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
-                        return JsonResponse(
-                                {
-                                        'message' : 'User fetched successfully',
-                                        'userId' : user.pk,
-                                        'username' : user.username,
-                                        'email' : user.email,
-                                        'dateJoined' : user.date_joined,
-                                })
-                
-                except Exception as e:
-                        
-                        return JsonResponse({'message' : f'{e}'})
+        user = request.user
+        return Response(
+            {
+                'message': 'User fetched successfully',
+                'userId': user.id,
+                'username': user.username,
+                'email': user.email,
+                'dateJoined': user.date_joined,
+            },
+            status=status.HTTP_200_OK
+        )
 
-                        
-        def post(self , request):
-                try:
-                        data = request.data
-                        username = data.get('username')
-                        password = data.get('password')
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
 
-                        if not username:
-                                return JsonResponse({'message' : 'Username is required'} , status = status.HTTP_400_BAD_REQUEST)
-                        
-                        if not password:
-                                return JsonResponse({'message' : 'Password is required'} , status = status.HTTP_400_BAD_REQUEST)
-                        
-                        user = authenticate(request=request, username = username , password = password)
+        if not username:
+            return Response(
+                {'message': 'Username is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-                        
+        if not password:
+            return Response(
+                {'message': 'Password is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-                        if not user :
-                                return JsonResponse({'message' : 'Invalid CRedentials'} , status = status.HTTP_401_UNAUTHORIZED)
-                        
-                        refresh = RefreshToken.for_user(user=user)
+        user = authenticate(username=username, password=password)
 
-                        return JsonResponse(
-                                {
-                                  'message' : 'Login Successful' ,
-                                  'accessToken' : str(refresh.access_token),
-                                  'refreshToken' : str(refresh)
-                                 } , status = status.HTTP_200_OK) 
-                                
-                
-                except Exception as e:
-                        
-                        return JsonResponse({'message' : f'An error occured, {str(e)}'} , status = status.HTTP_200_OK)
+        if not user:
+            return Response(
+                {'message': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response(
+            {
+                'message': 'Login successful',
+                'accessToken': str(refresh.access_token),
+                'refreshToken': str(refresh),
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+
+
+
 
 
 class SignUpAPIView(APIView):
-        permission_classes = [AllowAny]
-        def post(self , request):
-                    
-                    try:
-                        data = request.data
-                        username = data.get('username')
-                        password =data.get('password')
-                        email = data.get('email')
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        email = request.data.get('email')
+
+        if not username or not password or not email:
+            return Response(
+                {'message': 'All fields are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {'message': 'Username already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {'message': 'Email already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password
+        )
+
+        return Response(
+            {
+                'message': 'User created successfully',
+                'userId': user.id,
+                'username': user.username,
+                'email': user.email,
+                'dateJoined': user.date_joined,
+            },
+            status=status.HTTP_201_CREATED
+        )
 
 
-                        if not username and not password and not email:
-                                return JsonResponse({'message': 'Enter all details'} , status = status.HTTP_400_BAD_REQUEST)
-                        
-                        
-                        if User.objects.filter(username = username).exists() : 
-                                return JsonResponse({'message' : 'Username is already exists' }, status = status.HTTP_400_BAD_REQUEST)
-
-                        if User.objects.filter(email = email).exists():
-                                return JsonResponse({'message' : 'Email already exists'} , status = status.HTTP_400_BAD_REQUEST) 
-                        
-                        user = User.objects.create_user(
-                                username=username , 
-                                email=email,
-                                password=password
-                        )
-
-                        return JsonResponse(
-                                {
-                                        'message' : 'User created successfully',
-                                        'userId' : user.pk,
-                                        'username' : user.username,
-                                        'email' : user.email,
-                                        'dateJoined' : user.date_joined,
-                                } , status = status.HTTP_201_CREATED)
-                    except Exception as e:
-                            
-                            return JsonResponse({'message' : f'An error occurred {str(e)}'})
 
 
+class ValidationsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
-
-class ValidationsAPIView (APIView) :
-        permission_classes = [IsAuthenticated]
-
-        def get( self , request):
-                return JsonResponse({'message' : 'user is authenticated'} , status = status.HTTP_200_OK)
+    def get(self, request):
+        return Response(
+            {'message': 'User is authenticated'},
+            status=status.HTTP_200_OK
+        )
