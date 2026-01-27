@@ -17,8 +17,6 @@ class AuthorizationAPIView(APIView):
 
         def get(self , request):
                 
-                self.permission_classes = [IsAuthenticated]
-                self.check_permissions(request)
                 try : 
                         if not request.user:
                                 return JsonResponse({'message' : 'token is unavailable'} , status = status.HTTP_401_UNAUTHORIZED)
