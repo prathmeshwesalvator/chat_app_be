@@ -1,15 +1,20 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db import IntegrityError
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from app.models import Contact, UserProfile
+from app.serializers import ContactSerializer
+
 
 
 def root(request):
-        return Response({'message' : 'Welcome To The Auth Service'})
+        return JsonResponse({'message' : 'Welcome To The Auth Service'})
 
 
 
@@ -130,3 +135,97 @@ class ValidationsAPIView(APIView):
             {'message': 'User is authenticated'},
             status=status.HTTP_200_OK
         )
+
+
+
+class ContactAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        contacts = (
+            Contact.objects
+            .filter(owner=request.user)
+            .select_related('contact_user')
+        )
+
+        serializer = ContactSerializer(contacts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        contact_user_id = request.data.get('contact_user_id')
+        contact_hash = request.data.get('contact_hash')
+
+        if not contact_user_id and not contact_hash:
+            return Response(
+                {'message': 'contact_user_id or contact_hash is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # 🔹 Add via user ID
+            if contact_user_id:
+                contact_user = UserProfile.objects.get(id=contact_user_id).user
+            # 🔹 Add via QR hash
+            else:
+                qr_contact = UserProfile.objects.select_related('user').get(contact_hash=contact_hash)
+                contact_user = qr_contact.user
+
+            # Prevent adding self
+            if contact_user == request.user:
+                return Response(
+                    {'message': 'You cannot add yourself as a contact'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create contact if not exists
+            contact, created = Contact.objects.get_or_create(
+                owner=request.user,
+                contact_user=contact_user
+            )
+
+            if not created:
+                return Response(
+                    {'message': 'Contact already exists'},
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            serializer = ContactSerializer(contact)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except UserProfile.DoesNotExist:
+            return Response(
+                {'message': 'User not found or invalid QR code'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except IntegrityError:
+            return Response(
+                {'message': 'Contact already exists'},
+                status=status.HTTP_409_CONFLICT
+            )
+        
+    def delete(self, request):
+        contact_user_id = request.query_params.get('contact_user_id')
+
+        if not contact_user_id:
+            return Response(
+                {'message': 'contact_user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            contact = Contact.objects.get(
+                owner=request.user,
+                contact_user_id=contact_user_id
+            )
+
+            contact.delete()
+            return Response(
+                {'message': 'Contact deleted successfully'},
+                status=status.HTTP_200_OK
+            )
+
+        except Contact.DoesNotExist:
+            return Response(
+                {'message': 'Contact not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )

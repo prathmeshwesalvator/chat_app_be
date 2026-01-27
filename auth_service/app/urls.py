@@ -8,6 +8,6 @@ urlpatterns = [
     path('token/refresh/' , TokenRefreshView.as_view() , name='refresh_token'),
     path('me/' , AuthorizationAPIView.as_view() , name = 'me'),
     path('check/' , ValidationsAPIView.as_view() , name = 'token_check'),
-    path('signup/' , SignUpAPIView.as_view() , name='signup')
-
+    path('signup/' , SignUpAPIView.as_view() , name='signup'),
+    path('contacts/' , ContactAPIView.as_view() , name='contacts')
 ]
