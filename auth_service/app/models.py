@@ -1,3 +1,4 @@
+from time import timezone
 from django.db import models
 from django.contrib.auth.models import User
 import uuid
@@ -10,11 +11,24 @@ class UserProfile(models.Model):
     )
     bio = models.TextField(blank=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+
     contact_hash = models.UUIDField(
         default=uuid.uuid4,
         editable=False,
-        unique=True
+        unique=True,
+        null=True,
+        blank=True
     )
+
+    contact_hash_created_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    def is_qr_expired(self):
+        if not self.contact_hash_created_at:
+            return True
+        return timezone.now() > self.contact_hash_created_at + timezone.timedelta(minutes=5)
 
     def __str__(self):
         return f"{self.user.username}'s Profile"

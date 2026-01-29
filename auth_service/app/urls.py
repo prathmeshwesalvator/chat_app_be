@@ -9,5 +9,6 @@ urlpatterns = [
     path('me/' , AuthorizationAPIView.as_view() , name = 'me'),
     path('check/' , ValidationsAPIView.as_view() , name = 'token_check'),
     path('signup/' , SignUpAPIView.as_view() , name='signup'),
-    path('contacts/' , ContactAPIView.as_view() , name='contacts')
+    path('contacts/' , ContactAPIView.as_view() , name='contacts'),
+    path('qr-code/' , QRCodeAPIView.as_view() , name='qr_code'),
 ]

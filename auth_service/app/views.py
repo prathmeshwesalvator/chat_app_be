@@ -1,13 +1,15 @@
+from django.utils import timezone
+import uuid
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.db import IntegrityError
+from django.db import IntegrityError , transaction
 from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-
+import pytz
 from app.models import Contact, UserProfile
 from app.serializers import ContactSerializer
 
@@ -29,6 +31,7 @@ class AuthorizationAPIView(APIView):
             )
 
         user = request.user
+        user_profile = UserProfile.objects.get(user=user)
         return Response(
             {
                 'message': 'User fetched successfully',
@@ -36,6 +39,8 @@ class AuthorizationAPIView(APIView):
                 'username': user.username,
                 'email': user.email,
                 'dateJoined': user.date_joined,
+                'bio': user_profile.bio,
+                'avatar': user_profile.avatar.url if user_profile.avatar else None,
             },
             status=status.HTTP_200_OK
         )
@@ -74,11 +79,6 @@ class AuthorizationAPIView(APIView):
             },
             status=status.HTTP_200_OK
         )
-
-
-
-
-
 
 
 class SignUpAPIView(APIView):
@@ -125,8 +125,6 @@ class SignUpAPIView(APIView):
         )
 
 
-
-
 class ValidationsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -135,7 +133,6 @@ class ValidationsAPIView(APIView):
             {'message': 'User is authenticated'},
             status=status.HTTP_200_OK
         )
-
 
 
 class ContactAPIView(APIView):
@@ -151,6 +148,7 @@ class ContactAPIView(APIView):
         serializer = ContactSerializer(contacts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
     def post(self, request):
         contact_user_id = request.data.get('contact_user_id')
         contact_hash = request.data.get('contact_hash')
@@ -165,19 +163,40 @@ class ContactAPIView(APIView):
             # 🔹 Add via user ID
             if contact_user_id:
                 contact_user = UserProfile.objects.get(id=contact_user_id).user
+
             # 🔹 Add via QR hash
             else:
-                qr_contact = UserProfile.objects.select_related('user').get(contact_hash=contact_hash)
-                contact_user = qr_contact.user
+                qr_profile = (
+                    UserProfile.objects
+                    .select_related('user')
+                    .get(contact_hash=contact_hash)
+                )
 
-            # Prevent adding self
+                # 🚫 Reject expired QR
+                if qr_profile.is_qr_expired():
+                    # Optional: invalidate QR immediately
+                    qr_profile.contact_hash = None
+                    qr_profile.contact_hash_created_at = None
+                    qr_profile.save(update_fields=[
+                        'contact_hash',
+                        'contact_hash_created_at'
+                    ])
+
+                    return Response(
+                        {'message': 'QR code has expired'},
+                        status=status.HTTP_410_GONE
+                    )
+
+                contact_user = qr_profile.user
+
+            # 🚫 Prevent adding self
             if contact_user == request.user:
                 return Response(
                     {'message': 'You cannot add yourself as a contact'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Create contact if not exists
+            # ✅ Create contact if not exists
             contact, created = Contact.objects.get_or_create(
                 owner=request.user,
                 contact_user=contact_user
@@ -202,6 +221,8 @@ class ContactAPIView(APIView):
                 {'message': 'Contact already exists'},
                 status=status.HTTP_409_CONFLICT
             )
+
+
         
     def delete(self, request):
         contact_user_id = request.query_params.get('contact_user_id')
@@ -229,3 +250,30 @@ class ContactAPIView(APIView):
                 {'message': 'Contact not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class QRCodeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile = UserProfile.objects.select_for_update().get(user=request.user)
+
+        with transaction.atomic():
+            profile.contact_hash = uuid.uuid4()
+            profile.contact_hash_created_at = timezone.now()
+            profile.save()
+
+        ist_tz = pytz.timezone("Asia/Kolkata")
+        created_at_ist = timezone.localtime(
+            profile.contact_hash_created_at,
+            ist_tz
+        )
+
+        return Response(
+            {
+                "message": "New QR code generated",
+                "contactHash": str(profile.contact_hash),
+                "expiresInMinutes": "5",
+                "createdAt": created_at_ist
+            },
+            status=status.HTTP_200_OK)
