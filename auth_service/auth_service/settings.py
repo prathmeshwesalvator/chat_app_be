@@ -32,8 +32,11 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'corsheaders',
-     'app.apps.AppConfig',
+    'app.apps.AppConfig',
+    'channels',
+    'chatapp',
     'rest_framework',
     "django.contrib.admin",
     "django.contrib.auth",
@@ -71,7 +74,9 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "auth_service.wsgi.application"
+# WSGI_APPLICATION = "auth_service.wsgi.application"
+ASGI_APPLICATION = "auth_service.asgi.application"
+
 
 
 # Database
@@ -131,6 +136,17 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],
+        },
+    },
 }
 
 
