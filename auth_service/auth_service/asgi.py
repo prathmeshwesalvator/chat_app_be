@@ -1,14 +1,14 @@
 import os
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
+from chatapp.middleware import JWTAuthMiddleware
 import chatapp.routing  # your chat app routing
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "auth_service.settings")
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
+    "websocket": JWTAuthMiddleware(
         URLRouter(
             chatapp.routing.websocket_urlpatterns
         )

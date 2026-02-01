@@ -1,5 +1,13 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from django.contrib.auth import get_user_model
+
+from .models import ChatMessage
+
+
+User = get_user_model()
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
 
@@ -38,8 +46,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         message = data.get('message')
-        sender = data.get('sender', 'anonymous')
         receiver = data.get('receiver', 'all')
+
+        # Get sender from connection scope (requires AuthMiddlewareStack)
+        sender_user = self.scope.get('user')
+        if not sender_user or not getattr(sender_user, 'is_authenticated', False):
+            await self.send(text_data=json.dumps({
+                "type": "error",
+                "message": "Authentication required to send messages"
+            }))
+            return
+
+        sender = getattr(sender_user, 'id', None)
 
         if not message:
             await self.send(text_data=json.dumps({
@@ -58,6 +76,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }
         )
 
+        # Persist the message if receiver is a numeric id (direct message)
+        try:
+            # JSON numbers come in as int/float in Python; accept ints only
+            if isinstance(receiver, int) and isinstance(sender, int):
+                await self.save_message(sender, receiver, message)
+        except Exception:
+            # Don't fail the WebSocket if DB save fails; just log in server logs
+            import logging
+            logging.exception('Failed saving chat message')
+
         await self.send(text_data=json.dumps({
             "type": "ack",
             "message": "Message delivered"
@@ -70,3 +98,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "sender": event['sender'],
             "receiver": event['receiver'],
         }))
+
+    @database_sync_to_async
+    def save_message(self, sender_id, receiver_id, content):
+        """Create a ChatMessage instance linking to sender and receiver User ids.
+
+        Returns the created ChatMessage or None if users don't exist.
+        """
+        try:
+            sender = User.objects.get(pk=sender_id)
+            receiver = User.objects.get(pk=receiver_id)
+        except User.DoesNotExist:
+            return None
+
+        return ChatMessage.objects.create(sender=sender, receiver=receiver, content=content)
