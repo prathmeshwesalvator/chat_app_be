@@ -11,7 +11,7 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 import pytz
 from app.models import Contact, UserProfile
-from app.serializers import ContactSerializer
+from app.serializers import ContactSerializer, ContactUserSerializer
 
 
 
@@ -277,3 +277,36 @@ class QRCodeAPIView(APIView):
                 "createdAt": created_at_ist
             },
             status=status.HTTP_200_OK)
+    
+
+    def post(self, request):
+        data = request.data
+        contact_hash = data.get('contactHash')
+
+        if not contact_hash:
+            return Response(
+                {'message': 'contactHash is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            profile = UserProfile.objects.get(contact_hash=contact_hash)
+
+            # ✅ Check expiry
+            if profile.is_qr_expired():
+                return Response(
+                    {'message': 'QR code has expired'},
+                    status=status.HTTP_410_GONE
+                )
+
+            # ✅ Serialize USER (not profile)
+            serializer = ContactUserSerializer(profile.user)
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except UserProfile.DoesNotExist:
+            return Response(
+                {'message': 'Invalid contactHash'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
