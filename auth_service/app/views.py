@@ -150,19 +150,19 @@ class ContactAPIView(APIView):
 
 
     def post(self, request):
-        contact_user_id = request.data.get('mailId')
+        mailId = request.data.get('mailId')
         contact_hash = request.data.get('contactHash')
 
-        if not contact_user_id and not contact_hash:
+        if not mailId and not contact_hash:
             return Response(
-                {'message': 'contact_user_id or contact_hash is required'},
+                {'message': 'mailId or contactHash is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
             # 🔹 Add via user ID
-            if contact_user_id:
-                contact_user = UserProfile.objects.get(id=contact_user_id).user
+            if mailId:
+                contact_user = User.objects.get(email=mailId)
 
             # 🔹 Add via QR hash
             else:
