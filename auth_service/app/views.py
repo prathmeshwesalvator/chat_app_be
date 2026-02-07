@@ -150,8 +150,8 @@ class ContactAPIView(APIView):
 
 
     def post(self, request):
-        contact_user_id = request.data.get('contact_user_id')
-        contact_hash = request.data.get('contact_hash')
+        contact_user_id = request.data.get('mailId')
+        contact_hash = request.data.get('contactHash')
 
         if not contact_user_id and not contact_hash:
             return Response(
@@ -282,31 +282,41 @@ class QRCodeAPIView(APIView):
     def post(self, request):
         data = request.data
         contact_hash = data.get('contactHash')
+        mailId = data.get('mailId')
 
-        if not contact_hash:
+        # ✅ At least one required
+        if not contact_hash and not mailId:
             return Response(
-                {'message': 'contactHash is required'},
+                {'message': 'Either contactHash or mailId is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            profile = UserProfile.objects.get(contact_hash=contact_hash)
+            profile = None
 
-            # ✅ Check expiry
-            if profile.is_qr_expired():
-                return Response(
-                    {'message': 'QR code has expired'},
-                    status=status.HTTP_410_GONE
+            # 🔹 Priority 1 → contactHash
+            if contact_hash:
+                profile = UserProfile.objects.get(contact_hash=contact_hash)
+
+                if profile.is_qr_expired():
+                    return Response(
+                        {'message': 'QR code has expired'},
+                        status=status.HTTP_410_GONE
+                    )
+
+            # 🔹 Priority 2 → mailId
+            elif mailId:
+                profile = UserProfile.objects.select_related('user').get(
+                    user__email=mailId
                 )
 
-            # ✅ Serialize USER (not profile)
+            # ✅ Serialize user
             serializer = ContactUserSerializer(profile.user)
 
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except UserProfile.DoesNotExist:
             return Response(
-                {'message': 'Invalid contactHash'},
+                {'message': 'User not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-
