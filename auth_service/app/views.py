@@ -221,9 +221,6 @@ class ContactAPIView(APIView):
                 {'message': 'Contact already exists'},
                 status=status.HTTP_409_CONFLICT
             )
-
-
-        
     def delete(self, request):
         contact_user_id = request.query_params.get('contact_user_id')
 
