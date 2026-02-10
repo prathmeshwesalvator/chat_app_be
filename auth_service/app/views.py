@@ -116,6 +116,10 @@ class SignUpAPIView(APIView):
             password=password
         )
 
+        token = RefreshToken.for_user(user)
+        access_token = str(token.access_token)
+        refresh_token = str(token)
+
         return Response(
             {
                 'message': 'User created successfully',
@@ -123,6 +127,8 @@ class SignUpAPIView(APIView):
                 'username': user.username,
                 'email': user.email,
                 'dateJoined': user.date_joined,
+                'accessToken': access_token,
+                'refreshToken': refresh_token,
             },
             status=status.HTTP_201_CREATED
         )
