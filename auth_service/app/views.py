@@ -12,6 +12,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 import pytz
 from app.models import Contact, UserProfile
 from app.serializers import ContactSerializer, ContactUserSerializer
+from django.core.mail import send_mail
+from auth_service import settings
+from utils.redis_client import redis_client
 
 
 
@@ -148,7 +151,6 @@ class ContactAPIView(APIView):
         serializer = ContactSerializer(contacts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-
     def post(self, request):
         mailId = request.data.get('mailId')
         contact_hash = request.data.get('contactHash')
@@ -221,6 +223,7 @@ class ContactAPIView(APIView):
                 {'message': 'Contact already exists'},
                 status=status.HTTP_409_CONFLICT
             )
+   
     def delete(self, request):
         contact_user_id = request.query_params.get('contact_user_id')
 
@@ -275,7 +278,6 @@ class QRCodeAPIView(APIView):
             },
             status=status.HTTP_200_OK)
     
-
     def post(self, request):
         data = request.data
         contact_hash = data.get('contactHash')
@@ -317,3 +319,54 @@ class QRCodeAPIView(APIView):
                 {'message': 'User not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class SendOtpAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+
+        if not email:
+            return Response(
+                {"message": "Email is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        otp = str(uuid.uuid4().int)[:6]
+
+        redis_client.setex(
+            f"otp:{email}",
+            300,
+            otp
+        )
+
+        send_mail(
+            subject="Your OTP Code",
+            message=f"Your OTP is {otp}. It is valid for 5 minutes.",
+            from_email=settings.EMAIL_HOST_USER,
+            recipient_list=[email],
+        )
+
+        return Response({"message": "OTP sent"})
+
+
+class VerifyOtpAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+
+
+        saved_otp = redis_client.get(f"otp:{email}")
+
+        if not saved_otp:
+            return Response({"message": "OTP expired"}, status=400)
+
+        if saved_otp != otp:
+            return Response({"message": "Invalid OTP"}, status=400)
+
+        redis_client.delete(f"otp:{email}")
+
+        return Response({"message": "OTP verified"})

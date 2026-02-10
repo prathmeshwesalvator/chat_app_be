@@ -11,4 +11,6 @@ urlpatterns = [
     path('signup/' , SignUpAPIView.as_view() , name='signup'),
     path('contacts/' , ContactAPIView.as_view() , name='contacts'),
     path('qr-code/' , QRCodeAPIView.as_view() , name='qr_code'),
+    path('send-otp/' , SendOtpAPIView.as_view() , name='send_otp'),
+    path('verify-otp/' , VerifyOtpAPIView.as_view() , name='verify_otp'),
 ]
